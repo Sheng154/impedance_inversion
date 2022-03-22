@@ -11,7 +11,7 @@ import numpy as np
 import matplotlib as mpl
 import pylops
 
-# Parameters test commit
+# Parameters
 tmax = 0.2
 tmin = 0
 pop_no = 1500
