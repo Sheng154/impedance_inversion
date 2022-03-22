@@ -17,14 +17,14 @@ tmin = 0
 pop_no = 1500
 generations = 200
 g = 0
-CXPB = 0
-MUTPB = 1
+CXPB = 0.7
+MUTPB = 0.3
 imp_seabed = imp[0]
 f_wav = 50
 t_samples = 200
 # t_samples = 4 * (tmax - tmin) * f_wav
 
-creator.create('FitnessMulti', base.Fitness, weights=(1.0, 1.0))
+creator.create('FitnessMulti', base.Fitness, weights=(1.0, 0.5))
 creator.create('Individual', list, fitness=creator.FitnessMulti)
 
 toolbox = base.Toolbox()
@@ -37,7 +37,7 @@ toolbox.register('select1', tools.selBest)
 toolbox.register("select2", tools.selTournament, tournsize=3)
 toolbox.register("mate", tools.cxTwoPoint)
 # toolbox.register("mate2", tools.cxUniform)
-toolbox.register("mutate", tools.mutGaussian, mu=0, sigma=30, indpb=0.3)
+toolbox.register("mutate", tools.mutGaussian, mu=0, sigma=30, indpb=0.1)
 # toolbox.register("mutate", tools.mutUniformInt, low=7.4, up=7.9, indpb=0.05)
 stats_fit = tools.Statistics(lambda indi: ind.fitness.values)
 stats_fit.register("avg", np.mean)
@@ -46,7 +46,7 @@ stats_fit.register("min", np.min)
 stats_fit.register("max", np.max)
 
 imp_pop = toolbox.population(n=pop_no)
-imp_pop = stepped(imp_pop)
+# imp_pop = stepped(imp_pop)
 # imp_pop_whole = calibrating(imp_pop)  # add low frequency trend to high frequency
 # imp_pop_whole[0] = ndi.uniform_filter1d(imp_pop_whole[0], size=3)
 
@@ -75,14 +75,14 @@ while Error > 2 and g < generations:
             # toolbox.mate1(child1, child2)
             del child1.fitness.values
             del child2.fitness.values
-    offspring = stepped(offspring)
+    # offspring = stepped(offspring)
 
     # MUTATION
     for mutant in offspring:
         if random.random() < MUTPB:
             toolbox.mutate(mutant)
             del mutant.fitness.values
-    offspring = stepped(offspring)
+    # offspring = stepped(offspring)
 
     # Evaluate the fitness of individuals
     offspring_ = np.asarray(list(map(toolbox.clone, offspring)))    # 工具人，用以calibrate后计算fitness值
@@ -175,10 +175,10 @@ plt.yticks(fontsize=32)
 axs[0].set_ylabel('Normalised amplitude', fontsize=24)
 axs[0].tick_params(direction='out', length=15, width=4, grid_color='r', grid_alpha=0.5)
 
-axs[1].plot(plot_x, best_ind, linewidth=4)
-axs[1].plot(plot_x, high_filtered_imp, linewidth=4)
+axs[1].plot(plot_x, best_ind_whole, linewidth=4)
+axs[1].plot(plot_x, imp, linewidth=4)
 axs[1].set_xlim(0, 200)
-axs[1].set_ylim(-500, 500)
+axs[1].set_ylim(1500, 2800)
 axs[1].set_xlabel('Time (ms)', fontsize=24)
 axs[1].set_ylabel('Impedance' '$\mathregular{(m/s · g/cm^{3})}$', fontsize=24)
 axs[1].spines['bottom'].set_linewidth(4)
@@ -186,20 +186,19 @@ axs[1].spines['top'].set_linewidth(4)
 axs[1].spines['left'].set_linewidth(4)
 axs[1].spines['right'].set_linewidth(4)
 axs[1].tick_params(direction='out', length=15, width=4, grid_color='r', grid_alpha=0.5)
-axs.legend(fontsize=32)
 plt.xticks(fontsize=24)
 plt.yticks(fontsize=24)
 plt.show()
 
 ####################################
 fig, ax = plt.subplots()
-ax.plot(plot_x, best_ind_whole, label='Synthetic trace', linewidth=4)
-ax.plot(plot_x, imp, label='Field trace', linewidth=4)
+ax.plot(plot_x, best_ind, label='Synthetic trace', linewidth=4)
+ax.plot(plot_x, high_filtered_imp, label='Field trace', linewidth=4)
 ax.tick_params(direction='out', length=15, width=4, grid_color='r', grid_alpha=0.5)
 # ax.spines[bottom].set_linewidth(size).
 mpl.rcParams['axes.linewidth'] = 2  # set the value globally
 ax.set_xlim(0, 200)
-ax.set_ylim(1500, 2800)
+ax.set_ylim(-500, 500)
 plt.xticks(fontsize=32)
 plt.yticks(fontsize=32)
 ax.spines['bottom'].set_linewidth(4)
