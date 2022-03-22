@@ -14,8 +14,8 @@ import pylops
 # Parameters
 tmax = 0.2
 tmin = 0
-pop_no = 1500
-generations = 200
+pop_no = 2000
+generations = 250
 g = 0
 CXPB = 0.7
 MUTPB = 0.3
@@ -58,6 +58,7 @@ evolution1_max = []
 evolution1_ave = []
 evolution2 = []
 evolution3 = []
+err_imp_result = np.empty([generations, 3])
 
 while Error > 2 and g < generations:
     g = g + 1
@@ -121,14 +122,14 @@ while Error > 2 and g < generations:
     evolution3.append(residual)
 
     err_imp = []
-    err_imp_result = np.empty([generations, 2])
     for ind in offspring_whole:
         diff_imp = []
         for k in range(len(ind)):
-            diff_imp.append(abs(ind[k] - imp[k] / imp[k]))
+            diff_imp.append(abs((ind[k] - imp[k]) / imp[k]))
         err_imp.append(sum(diff_imp) / len(diff_imp))  # percentage model residual as Vardy
-    err_imp_result[g - 1:0] = min(err_imp)
-    err_imp_result[g - 1:1] = max(err_imp)
+    err_imp_result[g - 1, 0] = min(err_imp)
+    err_imp_result[g - 1, 1] = max(err_imp)
+    err_imp_result[g - 1, 2] = np.mean(err_imp)
 
 
 best_ind = np.asarray(imp_pop[fits.index(max(fits))])
@@ -136,8 +137,10 @@ best_ind = np.asarray(imp_pop[fits.index(max(fits))])
 # best_smoothed = ndi.uniform_filter1d(best_ind, size=3)
 # best_smoothed = butter_lowpass_filter(best_smoothed, 250, 1000)
 # best_ind = butter_lowpass_filter(best_ind, 250, 1000)
-best_ind_whole = best_ind + low_filtered_imp
+best_ind_whole = best_ind + low_filtered_imp   # encounterd difficulties when using Calibrating
 # best_whole_smoothed = ndi.uniform_filter1d(best_ind_whole, size=3)
+best_syn1 = omtx * best_ind
+best_syn1 = best_syn1 / max(best_syn1)
 best_syn = omtx * best_ind_whole
 best_syn = best_syn / max(best_syn)
 best_rc = calcuRc(best_ind_whole)
@@ -146,6 +149,15 @@ resi1 = erroreval(best_ind, high_filtered_imp)
 resi2 = erroreval(best_ind_whole, imp)
 # print('high-freq residual:' + str(resi1))
 # print('whole-freq residual:' + str(resi2))
+
+plot_x = np.arange(1, generations + 1)
+plt.plot(plot_x, err_imp_result[:, 0], label='min')
+plt.plot(plot_x, err_imp_result[:, 1], label='max')
+plt.plot(plot_x, err_imp_result[:, 2], label='mean')
+plt.xlabel('Generations')
+plt.ylabel('Impedance error')
+plt.legend()
+plt.show()
 
 plot_x = np.arange(1, t_samples + 1)
 plt.subplot(2, 1, 1)
@@ -168,6 +180,7 @@ axs[0].spines['left'].set_linewidth(4)
 axs[0].spines['right'].set_linewidth(4)
 axs[0].plot(plot_x, best_syn, label='best_syn', linewidth=4)
 axs[0].plot(plot_x, mtrace, label='mtrace', linewidth=4)
+axs[0].plot(plot_x, best_syn1, label='best_syn1', linewidth=4)
 axs[0].set_xlim(0, 200)
 axs[0].set_ylim(-1, 1)
 plt.xticks(fontsize=32)
@@ -175,10 +188,10 @@ plt.yticks(fontsize=32)
 axs[0].set_ylabel('Normalised amplitude', fontsize=24)
 axs[0].tick_params(direction='out', length=15, width=4, grid_color='r', grid_alpha=0.5)
 
-axs[1].plot(plot_x, best_ind_whole, linewidth=4)
-axs[1].plot(plot_x, imp, linewidth=4)
+axs[1].plot(plot_x, best_ind, linewidth=4)
+axs[1].plot(plot_x, high_filtered_imp, linewidth=4)
 axs[1].set_xlim(0, 200)
-axs[1].set_ylim(1500, 2800)
+axs[1].set_ylim(-500, 500)
 axs[1].set_xlabel('Time (ms)', fontsize=24)
 axs[1].set_ylabel('Impedance' '$\mathregular{(m/s · g/cm^{3})}$', fontsize=24)
 axs[1].spines['bottom'].set_linewidth(4)
@@ -192,21 +205,21 @@ plt.show()
 
 ####################################
 fig, ax = plt.subplots()
-ax.plot(plot_x, best_ind, label='Synthetic trace', linewidth=4)
-ax.plot(plot_x, high_filtered_imp, label='Field trace', linewidth=4)
+ax.plot(plot_x, best_ind_whole, label='best_ind_whole', linewidth=4)
+ax.plot(plot_x, imp, label='model impedance', linewidth=4)
 ax.tick_params(direction='out', length=15, width=4, grid_color='r', grid_alpha=0.5)
 # ax.spines[bottom].set_linewidth(size).
 mpl.rcParams['axes.linewidth'] = 2  # set the value globally
 ax.set_xlim(0, 200)
-ax.set_ylim(-500, 500)
-plt.xticks(fontsize=32)
-plt.yticks(fontsize=32)
+ax.set_ylim(1500, 2800)
+plt.xticks(fontsize=24)
+plt.yticks(fontsize=24)
 ax.spines['bottom'].set_linewidth(4)
 ax.spines['top'].set_linewidth(4)
 ax.spines['left'].set_linewidth(4)
 ax.spines['right'].set_linewidth(4)
-ax.set_xlabel('Time (ms)', fontsize=32)
-ax.set_ylabel('Normalised amplitude', fontsize=32)
+ax.set_xlabel('Time (ms)', fontsize=24)
+ax.set_ylabel('Impedance' '$\mathregular{(m/s · g/cm^{3})}$', fontsize=24)
 ax.legend(fontsize=32)
 # plt.plot(imps, 'r')
 # plt.plot(imps_, 'b')
