@@ -74,7 +74,7 @@ def generateSynthetic(rc_pop, wvlt):
 def erroreval(syn_imp, imp):
     diff = []
     for i in range(len(syn_imp)):
-        diff.append(abs((syn_imp[i] - imp[i])) / imp[i])
+        diff.append(abs((syn_imp[i] - imp[i]) / imp[i]))
     residual = sum(diff)/len(diff)   # average percentage error of impedance model as used by Vardy(2015)
     return residual
 
@@ -117,17 +117,16 @@ def butter_lowpass_filter(data, cutoff, fs):
 wavelet = ricker(f, length, dt)
 imp = createModel(nsamp)
 imp_log = np.log(imp)
-mback = filtfilt(np.ones(int(len(imp_log)/20)) / float(int(len(imp_log)/20)), 1, imp_log)
+mback = filtfilt(np.ones(int(len(imp)/20)) / float(int(len(imp)/20)), 1, imp)
 omtx = pylops.avo.poststack.PoststackLinearModelling(wavelet/2, nt0=len(imp), explicit=True)
 mtrace = omtx * imp
-mtrace = mtrace/max(mtrace)
+mtrace_norm = mtrace/max(mtrace)
 mtrace_n = mtrace + np.random.normal(0, 1e-2, mtrace.shape)
 Rc = calcuRc(imp)
 model_trace = generateSynthetic(Rc, wavelet)
 
 high_filtered_imp = butter_highpass_filter(imp, 50, 1000)
-low_filtered_imp = butter_lowpass_filter(imp, 50, 1000)
-
+low_filtered_imp = butter_lowpass_filter(imp, 25, 1000)
 minv1 = pylops.avo.poststack.PoststackInversion(
     mtrace_n, wavelet/2, m0=mback, explicit=True, simultaneous=True)[0]
 minv = pylops.avo.poststack.PoststackInversion(

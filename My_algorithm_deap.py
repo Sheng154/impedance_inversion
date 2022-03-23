@@ -4,7 +4,7 @@ from deap import base
 from deap import creator
 from deap import tools
 from functions import *
-from SYnthetic_case import model_trace, imp, wavelet, low_filtered_imp, high_filtered_imp, omtx
+from SYnthetic_case import mback, imp, wavelet, low_filtered_imp, high_filtered_imp, omtx
 # from thin_bed import imps, model_trace, wavelet
 import matplotlib.pyplot as plt
 import numpy as np
@@ -14,8 +14,8 @@ import pylops
 # Parameters
 tmax = 0.2
 tmin = 0
-pop_no = 2000
-generations = 250
+pop_no = 1000
+generations = 200
 g = 0
 CXPB = 0.7
 MUTPB = 0.3
@@ -24,7 +24,7 @@ f_wav = 50
 t_samples = 200
 # t_samples = 4 * (tmax - tmin) * f_wav
 
-creator.create('FitnessMulti', base.Fitness, weights=(1.0, 0.5))
+creator.create('FitnessMulti', base.Fitness, weights=(1.0, 0.1))
 creator.create('Individual', list, fitness=creator.FitnessMulti)
 
 toolbox = base.Toolbox()
@@ -37,7 +37,7 @@ toolbox.register('select1', tools.selBest)
 toolbox.register("select2", tools.selTournament, tournsize=3)
 toolbox.register("mate", tools.cxTwoPoint)
 # toolbox.register("mate2", tools.cxUniform)
-toolbox.register("mutate", tools.mutGaussian, mu=0, sigma=30, indpb=0.1)
+toolbox.register("mutate", tools.mutGaussian, mu=0, sigma=30, indpb=0.05)
 # toolbox.register("mutate", tools.mutUniformInt, low=7.4, up=7.9, indpb=0.05)
 stats_fit = tools.Statistics(lambda indi: ind.fitness.values)
 stats_fit.register("avg", np.mean)
@@ -64,8 +64,8 @@ while Error > 2 and g < generations:
     g = g + 1
     print("-- Generation %i --" % g)
     # SELECTION
-    offspring1 = toolbox.select1(imp_pop, int(pop_no / 4))  # SelBest
-    offspring2 = toolbox.select2(imp_pop, int(3 * pop_no / 4))  # selTournament
+    offspring1 = toolbox.select1(imp_pop, int(pop_no / 2))  # SelBest
+    offspring2 = toolbox.select2(imp_pop, int(pop_no / 2))  # selTournament
     offspring = offspring1 + offspring2
     offspring = list(map(toolbox.clone, offspring))
 
@@ -97,9 +97,9 @@ while Error > 2 and g < generations:
     imp_pop[:] = offspring
 
     fits = [ind.fitness.values[0] for ind in imp_pop]  # trace error absolute value
-    spiking = [ind.fitness.values[1] for ind in imp_pop]
-    hof = offspring[fits.index(max(fits))]
-    residual = erroreval(hof, imp)  # trace误差最小的model的residual，而非真正的最佳model
+    spiking = [1 / ind.fitness.values[1] for ind in imp_pop]
+    hof = imp_pop[fits.index(max(fits))]
+    residual = sum(abs(hof - high_filtered_imp)) / sum(abs(high_filtered_imp))  # trace误差最小的model的residual，而非真正的最佳model
 
     length = len(imp_pop)
     mean = sum(fits) / length
@@ -108,7 +108,7 @@ while Error > 2 and g < generations:
     A = 1 / min(fits)
     B = 1 / max(fits)
     C = 1 / mean
-    Error = 100 * B / sum(abs(mtrace))  # percentage error of synthetic traces
+    Error = 100 * B / sum(abs(mtrace_norm))  # percentage error of synthetic traces
     print("  Min %s" % B)  # 以下三个是trace的绝对误差
     print("  Max %s" % A)
     print("  Avg %s" % C)
@@ -131,13 +131,18 @@ while Error > 2 and g < generations:
     err_imp_result[g - 1, 1] = max(err_imp)
     err_imp_result[g - 1, 2] = np.mean(err_imp)
 
+    best_ind_whole = hof + low_filtered_imp
+    resi1 = sum(abs(hof - high_filtered_imp)) / sum(abs(high_filtered_imp))
+    resi2 = erroreval(best_ind_whole, imp)
+    print('high-freq residual:' + str(resi1))
+    print('whole-freq residual:' + str(resi2))
 
 best_ind = np.asarray(imp_pop[fits.index(max(fits))])
-# best_ind = butter_lowpass_filter(best_ind, 300, 1000)
-# best_smoothed = ndi.uniform_filter1d(best_ind, size=3)
-# best_smoothed = butter_lowpass_filter(best_smoothed, 250, 1000)
-# best_ind = butter_lowpass_filter(best_ind, 250, 1000)
 best_ind_whole = best_ind + low_filtered_imp   # encounterd difficulties when using Calibrating
+best_ind_lp = butter_lowpass_filter(best_ind, 300, 1000)
+best_ind_whole_lp = butter_lowpass_filter(best_ind_whole, 300, 1000)
+B = erroreval(best_ind_whole_lp, imp)
+print(B)
 # best_whole_smoothed = ndi.uniform_filter1d(best_ind_whole, size=3)
 best_syn1 = omtx * best_ind
 best_syn1 = best_syn1 / max(best_syn1)
@@ -145,15 +150,14 @@ best_syn = omtx * best_ind_whole
 best_syn = best_syn / max(best_syn)
 best_rc = calcuRc(best_ind_whole)
 
-resi1 = erroreval(best_ind, high_filtered_imp)
-resi2 = erroreval(best_ind_whole, imp)
-# print('high-freq residual:' + str(resi1))
-# print('whole-freq residual:' + str(resi2))
+minv = pylops.avo.poststack.PoststackInversion(mtrace, wavelet / 2, m0=mback, explicit=False, simultaneous=False)[0]
+plt.plot(evolution3)
+plt.show()
 
 plot_x = np.arange(1, generations + 1)
-plt.plot(plot_x, err_imp_result[:, 0], label='min')
-plt.plot(plot_x, err_imp_result[:, 1], label='max')
-plt.plot(plot_x, err_imp_result[:, 2], label='mean')
+plt.plot(plot_x, err_imp_result[:, 0], label='min', linewidth=4)
+plt.plot(plot_x, err_imp_result[:, 1], label='max', linewidth=4)
+plt.plot(plot_x, err_imp_result[:, 2], label='mean', linewidth=4)
 plt.xlabel('Generations')
 plt.ylabel('Impedance error')
 plt.legend()
@@ -164,10 +168,8 @@ plt.subplot(2, 1, 1)
 plt.plot(evolution1)
 plt.xlabel('Generations')
 plt.ylabel('Trace error')
-# plt.plot(np.arange(1, generations+1), err_imp_result[:, 0])
-# plt.plot(np.arange(1, generations+1), err_imp_result[:, 1])
 plt.subplot(2, 1, 2)
-plt.plot(evolution3)
+plt.plot(evolution2)
 plt.xlabel('Generations')
 plt.ylabel('Spiking intensity')
 plt.show()
@@ -179,17 +181,17 @@ axs[0].spines['top'].set_linewidth(4)
 axs[0].spines['left'].set_linewidth(4)
 axs[0].spines['right'].set_linewidth(4)
 axs[0].plot(plot_x, best_syn, label='best_syn', linewidth=4)
-axs[0].plot(plot_x, mtrace, label='mtrace', linewidth=4)
-axs[0].plot(plot_x, best_syn1, label='best_syn1', linewidth=4)
+axs[0].plot(plot_x, mtrace_norm, label='mtrace', linewidth=4)
 axs[0].set_xlim(0, 200)
 axs[0].set_ylim(-1, 1)
 plt.xticks(fontsize=32)
 plt.yticks(fontsize=32)
 axs[0].set_ylabel('Normalised amplitude', fontsize=24)
 axs[0].tick_params(direction='out', length=15, width=4, grid_color='r', grid_alpha=0.5)
+axs[0].legend()
 
-axs[1].plot(plot_x, best_ind, linewidth=4)
-axs[1].plot(plot_x, high_filtered_imp, linewidth=4)
+axs[1].plot(plot_x, best_ind, label='best_ind', linewidth=4)
+axs[1].plot(plot_x, high_filtered_imp, label='high_filtered_imp', linewidth=4)
 axs[1].set_xlim(0, 200)
 axs[1].set_ylim(-500, 500)
 axs[1].set_xlabel('Time (ms)', fontsize=24)
@@ -199,14 +201,16 @@ axs[1].spines['top'].set_linewidth(4)
 axs[1].spines['left'].set_linewidth(4)
 axs[1].spines['right'].set_linewidth(4)
 axs[1].tick_params(direction='out', length=15, width=4, grid_color='r', grid_alpha=0.5)
+axs[1].legend()
 plt.xticks(fontsize=24)
 plt.yticks(fontsize=24)
 plt.show()
 
 ####################################
 fig, ax = plt.subplots()
-ax.plot(plot_x, best_ind_whole, label='best_ind_whole', linewidth=4)
+ax.plot(plot_x, best_ind_whole_lp, label='best_ind_whole', linewidth=4)
 ax.plot(plot_x, imp, label='model impedance', linewidth=4)
+# ax.plot(plot_x, minv, label='minv', linewidth=4)
 ax.tick_params(direction='out', length=15, width=4, grid_color='r', grid_alpha=0.5)
 # ax.spines[bottom].set_linewidth(size).
 mpl.rcParams['axes.linewidth'] = 2  # set the value globally

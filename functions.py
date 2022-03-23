@@ -2,7 +2,7 @@ import numpy as np
 from scipy import signal
 import scipy.ndimage as ndi
 import matplotlib.pyplot as plt
-from SYnthetic_case import mtrace, low_filtered_imp, dt
+from SYnthetic_case import mtrace, mtrace_norm, low_filtered_imp, dt
 import pylops
 
 
@@ -120,7 +120,7 @@ def evaluate(synthetic, rc):
     rc_abs = [abs(ele) for ele in rc]
     spikes_sum = sum(rc_abs)
 
-    diff = synthetic - mtrace
+    diff = synthetic - mtrace_norm
     error = sum(abs(diff))
     fitness = (1/error, 1/spikes_sum)
     return fitness
@@ -129,7 +129,7 @@ def evaluate(synthetic, rc):
 def erroreval(syn_imp, imp):
     diff = []
     for i in range(len(syn_imp)):
-        diff.append(abs((syn_imp[i] - imp[i])) / imp[i])
+        diff.append(abs((syn_imp[i] - imp[i]) / imp[i]))
     residual = sum(diff)/len(diff)   # average percentage error of impedance model as used by Vardy(2015)
     return residual
 
