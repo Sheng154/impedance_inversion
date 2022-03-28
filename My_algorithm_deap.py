@@ -1,4 +1,4 @@
-# 20220323tt
+# 20220323
 import random
 import scipy.ndimage as ndi
 from deap import base
@@ -15,15 +15,13 @@ import pylops
 # Parameters
 tmax = 0.2
 tmin = 0
-pop_no = 1000
-generations = 200
+pop_no = 2000
+generations = 250
 g = 0
 CXPB = 0.7
 MUTPB = 0.3
 imp_seabed = imp[0]
-f_wav = 50
 t_samples = 200
-# t_samples = 4 * (tmax - tmin) * f_wav
 
 creator.create('FitnessMulti', base.Fitness, weights=(1.0, 0.1))
 creator.create('Individual', list, fitness=creator.FitnessMulti)
@@ -133,7 +131,8 @@ while Error > 2 and g < generations:
     err_imp_result[g - 1, 2] = np.mean(err_imp)
 
     best_ind_whole = hof + low_filtered_imp
-    resi1 = sum(abs(hof - high_filtered_imp)) / sum(abs(high_filtered_imp))
+    hof_lp = butter_lowpass_filter(hof, 300, 1000)
+    resi1 = sum(abs(hof_lp - high_filtered_imp)) / sum(abs(high_filtered_imp))
     resi2 = erroreval(best_ind_whole, imp)
     print('high-freq residual:' + str(resi1))
     print('whole-freq residual:' + str(resi2))
@@ -142,8 +141,15 @@ best_ind = np.asarray(imp_pop[fits.index(max(fits))])
 best_ind_whole = best_ind + low_filtered_imp   # encounterd difficulties when using Calibrating
 best_ind_lp = butter_lowpass_filter(best_ind, 300, 1000)
 best_ind_whole_lp = butter_lowpass_filter(best_ind_whole, 300, 1000)
+best_ind_whole_lp1 = filtfilt(np.ones(3) / float(3), 1, best_ind_whole)
+plt.plot(best_ind_whole)
+plt.plot(best_ind_whole_lp1)
+plt.plot(best_ind_whole_lp)
+plt.show()
 B = erroreval(best_ind_whole_lp, imp)
+C = erroreval(best_ind_whole_lp1, imp)
 print(B)
+print(C)
 # best_whole_smoothed = ndi.uniform_filter1d(best_ind_whole, size=3)
 best_syn1 = omtx * best_ind
 best_syn1 = best_syn1 / max(best_syn1)
@@ -209,14 +215,14 @@ plt.show()
 
 ####################################
 fig, ax = plt.subplots()
-ax.plot(plot_x, best_ind_whole_lp, label='best_ind_whole', linewidth=4)
-ax.plot(plot_x, imp, label='model impedance', linewidth=4)
+ax.plot(plot_x, imp, label='Synthetic impedance model', linewidth=4)
+ax.plot(plot_x, best_ind_whole_lp, label='Inverted impedance', linewidth=4)
 # ax.plot(plot_x, minv, label='minv', linewidth=4)
 ax.tick_params(direction='out', length=15, width=4, grid_color='r', grid_alpha=0.5)
 # ax.spines[bottom].set_linewidth(size).
 mpl.rcParams['axes.linewidth'] = 2  # set the value globally
 ax.set_xlim(0, 200)
-ax.set_ylim(1500, 2800)
+ax.set_ylim(1600, 2800)
 plt.xticks(fontsize=24)
 plt.yticks(fontsize=24)
 ax.spines['bottom'].set_linewidth(4)

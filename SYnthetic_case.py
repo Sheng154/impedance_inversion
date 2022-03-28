@@ -18,7 +18,7 @@ xt = np.arange(0, 200)
 max_guess, min_guess = 4500, 1000
 max_imp, min_imp = 3000, 1500
 # wavelet parameters
-f = 1000
+f = 500
 length = 0.071
 dt = 1e-3  # 1ms, 1,000Hz
 # Optimisation criterion
@@ -131,6 +131,8 @@ minv1 = pylops.avo.poststack.PoststackInversion(
     mtrace_n, wavelet/2, m0=mback, explicit=True, simultaneous=True)[0]
 minv = pylops.avo.poststack.PoststackInversion(
     mtrace, wavelet/2, m0=mback, explicit=True, simultaneous=True)[0]
+PP = erroreval(imp, low_filtered_imp)
+print(PP)
 '''
 plt.subplot(3, 1, 1)
 plt.plot(imp, label='raw')

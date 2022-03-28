@@ -1,6 +1,7 @@
 import numpy as np
 from scipy import signal
 import scipy.ndimage as ndi
+from scipy.signal import filtfilt
 import matplotlib.pyplot as plt
 from SYnthetic_case import mtrace, mtrace_norm, low_filtered_imp, dt
 import pylops

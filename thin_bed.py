@@ -1,9 +1,9 @@
 import matplotlib.pyplot as plt
 import numpy as np
 
-f = 5000
+f = 500
 length = 0.001  # 1 ms
-dt = 1e-5
+dt = 1e-3
 
 tb = [250, 200, 150, 100, 50, 25]
 tb_loc = np.array([4, 5, 6, 7, 8, 9])
