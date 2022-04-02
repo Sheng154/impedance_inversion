@@ -24,7 +24,7 @@ dt = 1e-3  # 1ms, 1,000Hz
 # Optimisation criterion
 L1 = True
 ###########################
-np.random.seed(12)
+np.random.seed(1234)
 
 nsamp = int((tmax - tmin) / dt)
 
@@ -133,6 +133,13 @@ minv = pylops.avo.poststack.PoststackInversion(
     mtrace, wavelet/2, m0=mback, explicit=True, simultaneous=True)[0]
 PP = erroreval(imp, low_filtered_imp)
 print(PP)
+AA = mback + high_filtered_imp
+BB = low_filtered_imp +high_filtered_imp
+plt.plot(imp, label='imp', linewidth=4)
+plt.plot(AA, label='A', linewidth=4)
+plt.plot(BB, label='B', linewidth=4)
+plt.legend()
+plt.show()
 '''
 plt.subplot(3, 1, 1)
 plt.plot(imp, label='raw')

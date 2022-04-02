@@ -1,8 +1,11 @@
 import matplotlib.pyplot as plt
 import numpy as np
+from scipy.signal import filtfilt
+from scipy import signal
+import pylops
 
-f = 500
-length = 0.001  # 1 ms
+f = 200
+length = 0.05  # 1 ms
 dt = 1e-3
 
 tb = [250, 200, 150, 100, 50, 25]
@@ -22,6 +25,7 @@ imp = np.concatenate((imp_L0, imp_L1))
 for i in range(len(tb_loc)):
     imp[tb_sample[i]:tb_sample[i]+tb_len] = imp_trend[tb_sample[i]:tb_sample[i]+tb_len] - tb[i]
 imps = np.reshape(imp, (len(imp), ))
+mback = filtfilt(np.ones(int(len(imps)/25)) / float(int(len(imps)/25)), 1, imps)
 
 
 def calcuRc(imp):
@@ -51,14 +55,45 @@ def power(timeseries):
     abs_fourier_transform = np.abs(fourier_transform)
     power_spectrum = np.square(abs_fourier_transform)
     frequency = np.linspace(0, 1 / (2 * dt), len(power_spectrum))
-    return frequency, power_spectrum
+    plt.plot(frequency, power_spectrum)
+    plt.show()
 
 
+def butter_lowpass(cutoff, fs, order):
+    nyq = 0.5 * fs
+    normal_cutoff = cutoff / nyq
+    b, a = signal.butter(order, normal_cutoff, btype="lowpass")
+    return b, a
+
+
+def butter_highpass(cutoff, fs, order):
+    nyq = 0.5 * fs
+    normal_cutoff = cutoff / nyq
+    b, a = signal.butter(order, normal_cutoff, btype="highpass")
+    return b, a
+
+
+def butter_highpass_filter(data, cutoff, fs):
+    b, a = butter_highpass(cutoff, fs, order=5)
+    y = signal.filtfilt(b, a, data)
+    return y
+
+
+def butter_lowpass_filter(data, cutoff, fs):
+    b, a = butter_lowpass(cutoff, fs, order=5)
+    y = signal.filtfilt(b, a, data)
+    return y
+
+
+high_filtered_imp = butter_highpass_filter(imps, 50, 1000)
+low_filtered_imp = butter_lowpass_filter(imps, 25, 1000)
 rc = calcuRc(imps)
 wavelet = ricker(f, length, dt)
+omtx = pylops.avo.poststack.PoststackLinearModelling(wavelet/2, nt0=len(imps), explicit=True)
+mtrace = omtx * imps
+mtrace_norm = mtrace/max(mtrace)
 Synthetic_raw, model_trace = SyntheticTrace(rc, wavelet)
-
-
+'''
 plt.plot(imp)
 plt.ylabel('Acoustic impedance')
 plt.xlabel('Time series')
@@ -67,23 +102,20 @@ plt.show()
 plt.plot(rc)
 plt.ylabel('Reflectivity coefficient')
 plt.xlabel('Time series')
+plt.show()
 
 plt.plot(wavelet)
 plt.ylabel('Amplitude')
 plt.xlabel('Time series')
+plt.show()
 
 plt.plot(model_trace)
 plt.ylabel('Amplitude')
 plt.xlabel('Time series')
 plt.show()
 
-
-f_trace, p_trace = power(model_trace)
-f_Rc, p_Rc = power(rc)
-f_wav, p_wav = power(wavelet)
-
 # imp = np.reshape(imp, (1, 1000))
-'''
+
 plt.subplot(1, 3, 1)
 plt.plot(f_wav, p_wav, 'g')
 plt.xlabel('Frequency(Hz)')

@@ -15,8 +15,8 @@ import pylops
 # Parameters
 tmax = 0.2
 tmin = 0
-pop_no = 2000
-generations = 250
+pop_no = 500
+generations = 100
 g = 0
 CXPB = 0.7
 MUTPB = 0.3
@@ -97,8 +97,8 @@ while Error > 2 and g < generations:
 
     fits = [ind.fitness.values[0] for ind in imp_pop]  # trace error absolute value
     spiking = [1 / ind.fitness.values[1] for ind in imp_pop]
-    hof = imp_pop[fits.index(max(fits))]
-    residual = sum(abs(hof - high_filtered_imp)) / sum(abs(high_filtered_imp))  # trace误差最小的model的residual，而非真正的最佳model
+    hof = imp_pop[fits.index(max(fits))]     # trace误差最小的model的residual，而非真正的最佳model
+    residual = sum(abs(hof - high_filtered_imp)) / sum(abs(high_filtered_imp))
 
     length = len(imp_pop)
     mean = sum(fits) / length
@@ -138,14 +138,11 @@ while Error > 2 and g < generations:
     print('whole-freq residual:' + str(resi2))
 
 best_ind = np.asarray(imp_pop[fits.index(max(fits))])
-best_ind_whole = best_ind + low_filtered_imp   # encounterd difficulties when using Calibrating
+best_ind_whole1 = best_ind + low_filtered_imp   # encounterd difficulties when using Calibrating
+best_ind_whole2 = best_ind + mback
 best_ind_lp = butter_lowpass_filter(best_ind, 300, 1000)
-best_ind_whole_lp = butter_lowpass_filter(best_ind_whole, 300, 1000)
-best_ind_whole_lp1 = filtfilt(np.ones(3) / float(3), 1, best_ind_whole)
-plt.plot(best_ind_whole)
-plt.plot(best_ind_whole_lp1)
-plt.plot(best_ind_whole_lp)
-plt.show()
+best_ind_whole_lp = filtfilt(np.ones(3) / float(3), 1, best_ind_whole1)   # butter_lowpass_filter(best_ind_whole, 300, 1000)
+best_ind_whole_lp1 = filtfilt(np.ones(3) / float(3), 1, best_ind_whole2)
 B = erroreval(best_ind_whole_lp, imp)
 C = erroreval(best_ind_whole_lp1, imp)
 print(B)
@@ -217,7 +214,7 @@ plt.show()
 fig, ax = plt.subplots()
 ax.plot(plot_x, imp, label='Synthetic impedance model', linewidth=4)
 ax.plot(plot_x, best_ind_whole_lp, label='Inverted impedance', linewidth=4)
-# ax.plot(plot_x, minv, label='minv', linewidth=4)
+ax.plot(plot_x, best_ind_whole_lp1, label='inv1', linewidth=4)
 ax.tick_params(direction='out', length=15, width=4, grid_color='r', grid_alpha=0.5)
 # ax.spines[bottom].set_linewidth(size).
 mpl.rcParams['axes.linewidth'] = 2  # set the value globally

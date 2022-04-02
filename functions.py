@@ -3,7 +3,8 @@ from scipy import signal
 import scipy.ndimage as ndi
 from scipy.signal import filtfilt
 import matplotlib.pyplot as plt
-from SYnthetic_case import mtrace, mtrace_norm, low_filtered_imp, dt
+from SYnthetic_case import mtrace, mtrace_norm, mback, low_filtered_imp, dt
+# from thin_bed import mtrace, mtrace_norm, mback, low_filtered_imp, dt
 import pylops
 
 
@@ -31,7 +32,7 @@ def calibrate(imp_pop, imp_seabed):
 def calibrating(imp_pop):
     for ind in imp_pop:
         for k in range(len(ind)):
-            ind[k] = ind[k] + low_filtered_imp[k]
+            ind[k] = ind[k] + mback[k]
     return imp_pop
 
 
