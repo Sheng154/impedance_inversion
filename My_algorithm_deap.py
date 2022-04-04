@@ -12,19 +12,49 @@ import numpy as np
 import matplotlib as mpl
 import pylops
 
+# wavelet parameters
+f = 500
+length = 0.071
+dt = 1e-3  # 1ms, 1,000Hz
+# Optimisation criterion
+L1 = True
+###########################
+np.random.seed(12)
+
 # Parameters
-tmax = 0.2
+tmax = 200 * 1e-3  # 10ms
 tmin = 0
+nsamp = int((tmax - tmin) / dt)
+xt = np.arange(0, 200)
 pop_no = 500
-generations = 100
+generations = 200
 g = 0
 CXPB = 0.7
 MUTPB = 0.3
 imp_seabed = imp[0]
 t_samples = 200
 
-creator.create('FitnessMulti', base.Fitness, weights=(1.0, 0.1))
-creator.create('Individual', list, fitness=creator.FitnessMulti)
+# Model generation
+wavelet = ricker(f, length, dt)
+imp = createModel(nsamp)
+imp_log = np.log(imp)
+mback = filtfilt(np.ones(int(len(imp)/20)) / float(int(len(imp)/20)), 1, imp)
+omtx = pylops.avo.poststack.PoststackLinearModelling(wavelet/2, nt0=len(imp), explicit=True)
+mtrace = omtx * imp
+mtrace_norm = mtrace/max(mtrace)
+mtrace_n = mtrace + np.random.normal(0, 1e-2, mtrace.shape)
+Rc = calcuRc(imp)
+model_trace = generateSynthetic(Rc, wavelet)
+high_filtered_imp = butter_highpass_filter(imp, 50, 1000)
+low_filtered_imp = butter_lowpass_filter(imp, 25, 1000)
+minv1 = pylops.avo.poststack.PoststackInversion(
+    mtrace_n, wavelet/2, m0=mback, explicit=True, simultaneous=True)[0]
+minv = pylops.avo.poststack.PoststackInversion(
+    mtrace, wavelet/2, m0=mback, explicit=True, simultaneous=True)[0]
+
+# Set up GA operators
+creator.create('FitnessMax', base.Fitness, weights=(1.0, ))
+creator.create('Individual', list, fitness=creator.FitnessMax)
 
 toolbox = base.Toolbox()
 toolbox.register("prior_range", np.random.normal, 0, 200)
@@ -96,7 +126,7 @@ while Error > 2 and g < generations:
     imp_pop[:] = offspring
 
     fits = [ind.fitness.values[0] for ind in imp_pop]  # trace error absolute value
-    spiking = [1 / ind.fitness.values[1] for ind in imp_pop]
+    # spiking = [1 / ind.fitness.values[1] for ind in imp_pop]
     hof = imp_pop[fits.index(max(fits))]     # trace误差最小的model的residual，而非真正的最佳model
     residual = sum(abs(hof - high_filtered_imp)) / sum(abs(high_filtered_imp))
 
@@ -117,7 +147,7 @@ while Error > 2 and g < generations:
     evolution1_min.append(B)
     evolution1_max.append(A)
     evolution1_ave.append(mean)
-    evolution2.append(np.mean(spiking))
+    # evolution2.append(np.mean(spiking))
     evolution3.append(residual)
 
     err_imp = []
@@ -173,7 +203,7 @@ plt.plot(evolution1)
 plt.xlabel('Generations')
 plt.ylabel('Trace error')
 plt.subplot(2, 1, 2)
-plt.plot(evolution2)
+# plt.plot(evolution2)
 plt.xlabel('Generations')
 plt.ylabel('Spiking intensity')
 plt.show()

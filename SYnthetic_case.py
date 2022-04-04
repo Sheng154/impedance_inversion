@@ -8,7 +8,9 @@ import pandas as pd
 import random
 from scipy.signal import filtfilt
 import pylops
-# import segyio from functions import *
+import xlsxwriter
+import segyio
+# from functions import *
 
 tmax = 200 * 1e-3  # 10ms
 tmin = 0
@@ -24,7 +26,7 @@ dt = 1e-3  # 1ms, 1,000Hz
 # Optimisation criterion
 L1 = True
 ###########################
-np.random.seed(1234)
+np.random.seed(12)
 
 nsamp = int((tmax - tmin) / dt)
 
@@ -44,13 +46,43 @@ def createModel(nsamp):
     return imp_trend
 
 
+def StepLayers(T, L, f, equal=True, normal=True):
+    # T: model length
+    # L: number of layers
+    # f: sample frequency
+    N = int(T * f)
+    if normal is True:
+        value = np.random.normal(2300, 400, L)
+    else:
+        value = np.random.uniform(1500, 2800, L)
+    A = np.zeros((N, L))
+    if equal is True:
+        for i in range(L):
+            A[:, i] = value[i]
+        B = np.ndarray.flatten(A, order='F')
+    else:
+        segment = np.random.randint(0, N, L - 1)
+        segment = np.append(segment, N)
+        segment = np.sort(segment)
+        length = []
+        length.append(segment[0])
+        for k in range(0, L - 1):
+            length.append(segment[k + 1] - segment[k])
+        for i in range(L):
+            for j in range(length[i]):
+                A[j, i] = value[i]
+        B = np.ndarray.flatten(A, order='F')
+        B = B[B != 0]
+    return B
+
+
 def calcuRc(imp_pop):
     rc_pop = []
     if len(np.shape(imp_pop)) == 1:
         nsamp = len(imp_pop)
         imp_individual = imp_pop
         for j in range(nsamp - 1):
-            rc_pop.append((imp_individual[j+1] - imp_individual[j]) / (imp_individual[j+1] + imp_individual[j]))
+            rc_pop.append((imp_individual[j + 1] - imp_individual[j]) / (imp_individual[j + 1] + imp_individual[j]))
     else:
         nmodel = np.shape(imp_pop)[0]
         nsamp = np.shape(imp_pop)[1]
@@ -58,7 +90,7 @@ def calcuRc(imp_pop):
             rc = []
             imp_individual = imp_pop[i]
             for j in range(nsamp - 1):
-                rc.append((imp_individual[j+1] - imp_individual[j]) / (imp_individual[j+1] + imp_individual[j]))
+                rc.append((imp_individual[j + 1] - imp_individual[j]) / (imp_individual[j + 1] + imp_individual[j]))
             rc_pop.append(rc)
     return rc_pop
 
@@ -68,14 +100,14 @@ def generateSynthetic(rc_pop, wvlt):
     trace2 = np.convolve(rc_pop, wvlt, mode='full')
     trace3 = np.convolve(rc_pop, wvlt, mode='validate')
     trace_norm = trace / max(abs(trace))
-    return trace_norm # trace_norm  # normalised synthetic trace population
+    return trace_norm  # trace_norm  # normalised synthetic trace population
 
 
 def erroreval(syn_imp, imp):
     diff = []
     for i in range(len(syn_imp)):
         diff.append(abs((syn_imp[i] - imp[i]) / imp[i]))
-    residual = sum(diff)/len(diff)   # average percentage error of impedance model as used by Vardy(2015)
+    residual = sum(diff) / len(diff)  # average percentage error of impedance model as used by Vardy(2015)
     return residual
 
 
@@ -117,29 +149,19 @@ def butter_lowpass_filter(data, cutoff, fs):
 wavelet = ricker(f, length, dt)
 imp = createModel(nsamp)
 imp_log = np.log(imp)
-mback = filtfilt(np.ones(int(len(imp)/20)) / float(int(len(imp)/20)), 1, imp)
-omtx = pylops.avo.poststack.PoststackLinearModelling(wavelet/2, nt0=len(imp), explicit=True)
+mback = filtfilt(np.ones(int(len(imp) / 20)) / float(int(len(imp) / 20)), 1, imp)
+omtx = pylops.avo.poststack.PoststackLinearModelling(wavelet / 2, nt0=len(imp), explicit=True)
 mtrace = omtx * imp
-mtrace_norm = mtrace/max(mtrace)
+mtrace_norm = mtrace / max(mtrace)
 mtrace_n = mtrace + np.random.normal(0, 1e-2, mtrace.shape)
 Rc = calcuRc(imp)
 model_trace = generateSynthetic(Rc, wavelet)
-
 high_filtered_imp = butter_highpass_filter(imp, 50, 1000)
 low_filtered_imp = butter_lowpass_filter(imp, 25, 1000)
 minv1 = pylops.avo.poststack.PoststackInversion(
-    mtrace_n, wavelet/2, m0=mback, explicit=True, simultaneous=True)[0]
+    mtrace_n, wavelet / 2, m0=mback, explicit=True, simultaneous=True)[0]
 minv = pylops.avo.poststack.PoststackInversion(
-    mtrace, wavelet/2, m0=mback, explicit=True, simultaneous=True)[0]
-PP = erroreval(imp, low_filtered_imp)
-print(PP)
-AA = mback + high_filtered_imp
-BB = low_filtered_imp +high_filtered_imp
-plt.plot(imp, label='imp', linewidth=4)
-plt.plot(AA, label='A', linewidth=4)
-plt.plot(BB, label='B', linewidth=4)
-plt.legend()
-plt.show()
+    mtrace, wavelet / 2, m0=mback, explicit=True, simultaneous=True)[0]
 '''
 plt.subplot(3, 1, 1)
 plt.plot(imp, label='raw')
@@ -212,7 +234,6 @@ plt.legend(fontsize=32)
 # plt.plot(imps_, 'b')
 plt.show()
 '''
-
 
 '''
 plt.plot(imps, 'g')
