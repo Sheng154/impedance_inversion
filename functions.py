@@ -124,7 +124,7 @@ def evaluate(synthetic, rc):
 
     diff = synthetic - mtrace_norm
     error = sum(abs(diff))
-    fitness = (1/error, )  # 1/spikes_sum
+    fitness = (1/error, 1/spikes_sum)
     return fitness
 
 

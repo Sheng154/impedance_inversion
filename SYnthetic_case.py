@@ -10,19 +10,18 @@ from scipy.signal import filtfilt
 import pylops
 import xlsxwriter
 import segyio
+
 # from functions import *
 
 tmax = 200 * 1e-3  # 10ms
 tmin = 0
 xt = np.arange(0, 200)
 
-# impedance range
-max_guess, min_guess = 4500, 1000
-max_imp, min_imp = 3000, 1500
 # wavelet parameters
 f = 500
 length = 0.071
 dt = 1e-3  # 1ms, 1,000Hz
+f_sample = 1 / dt
 # Optimisation criterion
 L1 = True
 ###########################
@@ -38,11 +37,12 @@ def ricker(f, length, dt):
 
 
 def createModel(nsamp):
-    nsmooth = 3
+    nsmooth = 5  # smooth the impedance trace, the bigger the smoother
     imp = np.random.normal(2300, 400, nsamp)  # Determines the range of synthetic impedance model
+    # imp = np.random.uniform(1500, 2800, nsamp)
     imp_filt = filtfilt(np.ones(nsmooth) / float(nsmooth), 1, imp)
     imp_trend = imp_filt + np.arange(nsamp)
-    imp_smooth = ndi.uniform_filter1d(imp, size=3)
+    # imp_smooth = ndi.uniform_filter1d(imp, size=3)
     return imp_trend
 
 
@@ -55,8 +55,8 @@ def StepLayers(T, L, f, equal=True, normal=True):
         value = np.random.normal(2300, 400, L)
     else:
         value = np.random.uniform(1500, 2800, L)
-    A = np.zeros((N, L))
     if equal is True:
+        A = np.zeros((int(N / L), L))
         for i in range(L):
             A[:, i] = value[i]
         B = np.ndarray.flatten(A, order='F')
@@ -64,16 +64,25 @@ def StepLayers(T, L, f, equal=True, normal=True):
         segment = np.random.randint(0, N, L - 1)
         segment = np.append(segment, N)
         segment = np.sort(segment)
-        length = []
-        length.append(segment[0])
+        A = np.zeros((max(segment), L))
+        l = [segment[0]]
         for k in range(0, L - 1):
-            length.append(segment[k + 1] - segment[k])
+            l.append(segment[k + 1] - segment[k])
         for i in range(L):
-            for j in range(length[i]):
+            for j in range(l[i]):
                 A[j, i] = value[i]
         B = np.ndarray.flatten(A, order='F')
         B = B[B != 0]
     return B
+
+
+def Jump(nsamp):
+    vp = 1500 + np.arange(nsamp) + filtfilt(np.ones(5) / 5.0, 1, np.random.normal(0, 80, nsamp))
+    rho = 1600 + filtfilt(np.ones(5) / 5.0, 1, np.random.normal(0, 30, nsamp))
+    vp[131:] += 300
+    rho[131:] += 50
+    imp = vp * rho / 1000
+    return imp
 
 
 def calcuRc(imp_pop):
@@ -120,34 +129,21 @@ def power(timeseries):
     plt.show()
 
 
-def butter_lowpass(cutoff, fs, order):
-    nyq = 0.5 * fs
+def butter_filter(data, cutoff, highpass=True):
+    order = 5
+    nyq = 0.5 * f_sample
     normal_cutoff = cutoff / nyq
-    b, a = signal.butter(order, normal_cutoff, btype="lowpass")
-    return b, a
-
-
-def butter_highpass(cutoff, fs, order):
-    nyq = 0.5 * fs
-    normal_cutoff = cutoff / nyq
-    b, a = signal.butter(order, normal_cutoff, btype="highpass")
-    return b, a
-
-
-def butter_highpass_filter(data, cutoff, fs):
-    b, a = butter_highpass(cutoff, fs, order=5)
-    y = signal.filtfilt(b, a, data)
-    return y
-
-
-def butter_lowpass_filter(data, cutoff, fs):
-    b, a = butter_lowpass(cutoff, fs, order=5)
+    if highpass is True:
+        b, a = signal.butter(order, normal_cutoff, btype="highpass")
+    else:
+        b, a = signal.butter(order, normal_cutoff, btype="lowpass")
     y = signal.filtfilt(b, a, data)
     return y
 
 
 wavelet = ricker(f, length, dt)
 imp = createModel(nsamp)
+# imp = Jump(nsamp)
 imp_log = np.log(imp)
 mback = filtfilt(np.ones(int(len(imp) / 20)) / float(int(len(imp) / 20)), 1, imp)
 omtx = pylops.avo.poststack.PoststackLinearModelling(wavelet / 2, nt0=len(imp), explicit=True)
@@ -156,12 +152,16 @@ mtrace_norm = mtrace / max(mtrace)
 mtrace_n = mtrace + np.random.normal(0, 1e-2, mtrace.shape)
 Rc = calcuRc(imp)
 model_trace = generateSynthetic(Rc, wavelet)
-high_filtered_imp = butter_highpass_filter(imp, 50, 1000)
-low_filtered_imp = butter_lowpass_filter(imp, 25, 1000)
+high_filtered_imp = butter_filter(imp, 5, highpass=True)
+low_filtered_imp = butter_filter(imp, 20, highpass=False)
 minv1 = pylops.avo.poststack.PoststackInversion(
     mtrace_n, wavelet / 2, m0=mback, explicit=True, simultaneous=True)[0]
 minv = pylops.avo.poststack.PoststackInversion(
     mtrace, wavelet / 2, m0=mback, explicit=True, simultaneous=True)[0]
+plt.plot(imp)
+plt.plot(low_filtered_imp)
+# plt.plot(high_filtered_imp)
+plt.show()
 '''
 plt.subplot(3, 1, 1)
 plt.plot(imp, label='raw')

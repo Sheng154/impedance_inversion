@@ -27,34 +27,17 @@ tmin = 0
 nsamp = int((tmax - tmin) / dt)
 xt = np.arange(0, 200)
 pop_no = 500
-generations = 200
+generations = 250
 g = 0
 CXPB = 0.7
 MUTPB = 0.3
 imp_seabed = imp[0]
 t_samples = 200
 
-# Model generation
-wavelet = ricker(f, length, dt)
-imp = createModel(nsamp)
-imp_log = np.log(imp)
-mback = filtfilt(np.ones(int(len(imp)/20)) / float(int(len(imp)/20)), 1, imp)
-omtx = pylops.avo.poststack.PoststackLinearModelling(wavelet/2, nt0=len(imp), explicit=True)
-mtrace = omtx * imp
-mtrace_norm = mtrace/max(mtrace)
-mtrace_n = mtrace + np.random.normal(0, 1e-2, mtrace.shape)
-Rc = calcuRc(imp)
-model_trace = generateSynthetic(Rc, wavelet)
-high_filtered_imp = butter_highpass_filter(imp, 50, 1000)
-low_filtered_imp = butter_lowpass_filter(imp, 25, 1000)
-minv1 = pylops.avo.poststack.PoststackInversion(
-    mtrace_n, wavelet/2, m0=mback, explicit=True, simultaneous=True)[0]
-minv = pylops.avo.poststack.PoststackInversion(
-    mtrace, wavelet/2, m0=mback, explicit=True, simultaneous=True)[0]
 
 # Set up GA operators
-creator.create('FitnessMax', base.Fitness, weights=(1.0, ))
-creator.create('Individual', list, fitness=creator.FitnessMax)
+creator.create('FitnessMulti', base.Fitness, weights=(1.0, 1.0))
+creator.create('Individual', list, fitness=creator.FitnessMulti)
 
 toolbox = base.Toolbox()
 toolbox.register("prior_range", np.random.normal, 0, 200)
@@ -78,7 +61,6 @@ imp_pop = toolbox.population(n=pop_no)
 # imp_pop = stepped(imp_pop)
 # imp_pop_whole = calibrating(imp_pop)  # add low frequency trend to high frequency
 # imp_pop_whole[0] = ndi.uniform_filter1d(imp_pop_whole[0], size=3)
-
 
 Error = 10
 evolution1 = []
@@ -126,7 +108,7 @@ while Error > 2 and g < generations:
     imp_pop[:] = offspring
 
     fits = [ind.fitness.values[0] for ind in imp_pop]  # trace error absolute value
-    # spiking = [1 / ind.fitness.values[1] for ind in imp_pop]
+    spiking = [1 / ind.fitness.values[1] for ind in imp_pop]
     hof = imp_pop[fits.index(max(fits))]     # trace误差最小的model的residual，而非真正的最佳model
     residual = sum(abs(hof - high_filtered_imp)) / sum(abs(high_filtered_imp))
 
@@ -147,7 +129,7 @@ while Error > 2 and g < generations:
     evolution1_min.append(B)
     evolution1_max.append(A)
     evolution1_ave.append(mean)
-    # evolution2.append(np.mean(spiking))
+    evolution2.append(np.mean(spiking))
     evolution3.append(residual)
 
     err_imp = []
@@ -203,7 +185,7 @@ plt.plot(evolution1)
 plt.xlabel('Generations')
 plt.ylabel('Trace error')
 plt.subplot(2, 1, 2)
-# plt.plot(evolution2)
+plt.plot(evolution2)
 plt.xlabel('Generations')
 plt.ylabel('Spiking intensity')
 plt.show()
@@ -227,7 +209,7 @@ axs[0].legend()
 axs[1].plot(plot_x, best_ind, label='best_ind', linewidth=4)
 axs[1].plot(plot_x, high_filtered_imp, label='high_filtered_imp', linewidth=4)
 axs[1].set_xlim(0, 200)
-axs[1].set_ylim(-500, 500)
+axs[1].set_ylim(-800, 800)
 axs[1].set_xlabel('Time (ms)', fontsize=24)
 axs[1].set_ylabel('Impedance' '$\mathregular{(m/s · g/cm^{3})}$', fontsize=24)
 axs[1].spines['bottom'].set_linewidth(4)
@@ -244,12 +226,12 @@ plt.show()
 fig, ax = plt.subplots()
 ax.plot(plot_x, imp, label='Synthetic impedance model', linewidth=4)
 ax.plot(plot_x, best_ind_whole_lp, label='Inverted impedance', linewidth=4)
-ax.plot(plot_x, best_ind_whole_lp1, label='inv1', linewidth=4)
+ax.plot(plot_x, best_ind_whole_lp1, label='Inv1', linewidth=4)
 ax.tick_params(direction='out', length=15, width=4, grid_color='r', grid_alpha=0.5)
 # ax.spines[bottom].set_linewidth(size).
 mpl.rcParams['axes.linewidth'] = 2  # set the value globally
 ax.set_xlim(0, 200)
-ax.set_ylim(1600, 2800)
+ax.set_ylim(1500, 2800)
 plt.xticks(fontsize=24)
 plt.yticks(fontsize=24)
 ax.spines['bottom'].set_linewidth(4)
