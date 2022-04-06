@@ -11,6 +11,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import matplotlib as mpl
 import pylops
+import scipy
 
 # wavelet parameters
 f = 500
@@ -26,8 +27,8 @@ tmax = 200 * 1e-3  # 10ms
 tmin = 0
 nsamp = int((tmax - tmin) / dt)
 xt = np.arange(0, 200)
-pop_no = 500
-generations = 250
+pop_no = 1000
+generations = 220
 g = 0
 CXPB = 0.7
 MUTPB = 0.3
@@ -36,7 +37,7 @@ t_samples = 200
 
 
 # Set up GA operators
-creator.create('FitnessMulti', base.Fitness, weights=(1.0, 1.0))
+creator.create('FitnessMulti', base.Fitness, weights=(1.0, ))
 creator.create('Individual', list, fitness=creator.FitnessMulti)
 
 toolbox = base.Toolbox()
@@ -71,7 +72,7 @@ evolution2 = []
 evolution3 = []
 err_imp_result = np.empty([generations, 3])
 
-while Error > 2 and g < generations:
+while Error > 0 and g < generations:
     g = g + 1
     print("-- Generation %i --" % g)
     # SELECTION
@@ -108,8 +109,9 @@ while Error > 2 and g < generations:
     imp_pop[:] = offspring
 
     fits = [ind.fitness.values[0] for ind in imp_pop]  # trace error absolute value
-    spiking = [1 / ind.fitness.values[1] for ind in imp_pop]
+    # spiking = [1 / ind.fitness.values[1] for ind in imp_pop]
     hof = imp_pop[fits.index(max(fits))]     # trace误差最小的model的residual，而非真正的最佳model
+    hof = filtfilt(np.ones(3) / float(3), 1, hof)
     residual = sum(abs(hof - high_filtered_imp)) / sum(abs(high_filtered_imp))
 
     length = len(imp_pop)
@@ -129,7 +131,7 @@ while Error > 2 and g < generations:
     evolution1_min.append(B)
     evolution1_max.append(A)
     evolution1_ave.append(mean)
-    evolution2.append(np.mean(spiking))
+    # evolution2.append(np.mean(spiking))
     evolution3.append(residual)
 
     err_imp = []
@@ -143,6 +145,10 @@ while Error > 2 and g < generations:
     err_imp_result[g - 1, 2] = np.mean(err_imp)
 
     best_ind_whole = hof + low_filtered_imp
+    eval = scipy.stats.linregress(hof, high_filtered_imp)
+    print('r2 for high: ' + str(eval.rvalue ** 2))
+    eval1 = scipy.stats.linregress(best_ind_whole, imp)
+    print('r2 for whole: ' + str(eval1.rvalue ** 2))
     hof_lp = butter_lowpass_filter(hof, 300, 1000)
     resi1 = sum(abs(hof_lp - high_filtered_imp)) / sum(abs(high_filtered_imp))
     resi2 = erroreval(best_ind_whole, imp)
@@ -153,18 +159,15 @@ best_ind = np.asarray(imp_pop[fits.index(max(fits))])
 best_ind_whole1 = best_ind + low_filtered_imp   # encounterd difficulties when using Calibrating
 best_ind_whole2 = best_ind + mback
 best_ind_lp = butter_lowpass_filter(best_ind, 300, 1000)
-best_ind_whole_lp = filtfilt(np.ones(3) / float(3), 1, best_ind_whole1)   # butter_lowpass_filter(best_ind_whole, 300, 1000)
-best_ind_whole_lp1 = filtfilt(np.ones(3) / float(3), 1, best_ind_whole2)
-B = erroreval(best_ind_whole_lp, imp)
-C = erroreval(best_ind_whole_lp1, imp)
-print(B)
-print(C)
+
 # best_whole_smoothed = ndi.uniform_filter1d(best_ind_whole, size=3)
 best_syn1 = omtx * best_ind
 best_syn1 = best_syn1 / max(best_syn1)
 best_syn = omtx * best_ind_whole
 best_syn = best_syn / max(best_syn)
 best_rc = calcuRc(best_ind_whole)
+r2_trace = scipy.stats.linregress(best_syn, mtrace_norm)
+print('r2_trace:' + str(r2_trace.rvalue ** 2))
 
 minv = pylops.avo.poststack.PoststackInversion(mtrace, wavelet / 2, m0=mback, explicit=False, simultaneous=False)[0]
 plt.plot(evolution3)
@@ -200,8 +203,8 @@ axs[0].plot(plot_x, best_syn, label='best_syn', linewidth=4)
 axs[0].plot(plot_x, mtrace_norm, label='mtrace', linewidth=4)
 axs[0].set_xlim(0, 200)
 axs[0].set_ylim(-1, 1)
-plt.xticks(fontsize=32)
-plt.yticks(fontsize=32)
+plt.xticks(fontsize=12)
+plt.yticks(fontsize=12)
 axs[0].set_ylabel('Normalised amplitude', fontsize=24)
 axs[0].tick_params(direction='out', length=15, width=4, grid_color='r', grid_alpha=0.5)
 axs[0].legend()
@@ -218,15 +221,14 @@ axs[1].spines['left'].set_linewidth(4)
 axs[1].spines['right'].set_linewidth(4)
 axs[1].tick_params(direction='out', length=15, width=4, grid_color='r', grid_alpha=0.5)
 axs[1].legend()
-plt.xticks(fontsize=24)
-plt.yticks(fontsize=24)
+plt.xticks(fontsize=12)
+plt.yticks(fontsize=12)
 plt.show()
 
 ####################################
 fig, ax = plt.subplots()
 ax.plot(plot_x, imp, label='Synthetic impedance model', linewidth=4)
-ax.plot(plot_x, best_ind_whole_lp, label='Inverted impedance', linewidth=4)
-ax.plot(plot_x, best_ind_whole_lp1, label='Inv1', linewidth=4)
+ax.plot(plot_x, best_ind_whole1, label='Inverted impedance model', linewidth=4)
 ax.tick_params(direction='out', length=15, width=4, grid_color='r', grid_alpha=0.5)
 # ax.spines[bottom].set_linewidth(size).
 mpl.rcParams['axes.linewidth'] = 2  # set the value globally

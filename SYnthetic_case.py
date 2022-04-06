@@ -18,7 +18,7 @@ tmin = 0
 xt = np.arange(0, 200)
 
 # wavelet parameters
-f = 500
+f = 150
 length = 0.071
 dt = 1e-3  # 1ms, 1,000Hz
 f_sample = 1 / dt
@@ -145,7 +145,9 @@ wavelet = ricker(f, length, dt)
 imp = createModel(nsamp)
 # imp = Jump(nsamp)
 imp_log = np.log(imp)
-mback = filtfilt(np.ones(int(len(imp) / 20)) / float(int(len(imp) / 20)), 1, imp)
+plt.plot(imp_log)
+plt.show()
+mback = filtfilt(np.ones(50) / float(int(50)), 1, imp)
 omtx = pylops.avo.poststack.PoststackLinearModelling(wavelet / 2, nt0=len(imp), explicit=True)
 mtrace = omtx * imp
 mtrace_norm = mtrace / max(mtrace)
@@ -158,9 +160,13 @@ minv1 = pylops.avo.poststack.PoststackInversion(
     mtrace_n, wavelet / 2, m0=mback, explicit=True, simultaneous=True)[0]
 minv = pylops.avo.poststack.PoststackInversion(
     mtrace, wavelet / 2, m0=mback, explicit=True, simultaneous=True)[0]
+PP = scipy.stats.linregress(imp, low_filtered_imp)
+QQ = scipy.stats.linregress(imp, mback)
+print(PP.rvalue ** 2)
+print(QQ.rvalue ** 2)
 plt.plot(imp)
 plt.plot(low_filtered_imp)
-# plt.plot(high_filtered_imp)
+plt.plot(mback)
 plt.show()
 '''
 plt.subplot(3, 1, 1)
